@@ -1,210 +1,197 @@
 # EPS LAB 09 – Serial Mirror Detector & Data Extractor (VHDL)
 
-This project implements the **LAB09** assignment from  
-**Electronics Programmable Systems (EPS), University of Palermo**, based on the official exam specifications. fileciteturn7file0
+This project implements the **LAB09** assignment from the  
+**Electronics Programmable Systems (EPS)** course at the University of Palermo.  
+The system receives two 16-bit serial data streams and examines their structure to detect various “mirror” patterns as required by the official lab specification.
 
-The objective is to design a fully synchronous VHDL entity capable of:
-
-- Analyzing two **16‑bit serial inputs** (`DIN1`, `DIN2`)
-- Detecting **mirror patterns** across the two 16‑bit words
-- Detecting **mirror patterns inside each word** (between byte 1 and byte 2)
-- Generating one‑cycle or two‑cycle **BINGO pulses**
-- Emitting:
-  - `DOUT16` → the 16‑bit word received on `DIN2`
-  - `DOUT_BYTE` → the first byte of `DIN1`
-- Supporting high‑speed operation **> 1 Mbit/s**
-- Implementing a **DISABLE** signal placing all outputs in **high‑impedance**
+The design is fully synchronous and is suitable for FPGA implementation.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
-eps-lab09-serial-mirror-detector/
+eps-lab09-serial-detector/
 ├── README.md
 ├── docs/
 │   └── EPS_LAB09_20240524.pdf
 └── src/
-    ├── LAB09.vhd
-    └── tb_LAB09.vhd
+    └── LAB09.vhd
 ```
 
----
-
-## 🎯 Functional Specification (Summary)
-
-Based on the official lab sheet: fileciteturn7file0
-
-### 1. **Input Acquisition**
-- The entity receives two serial streams of 16 bits each:
-  - `DIN1`
-  - `DIN2`
-- Bits are shifted in synchronously with `CLK`.
-- A **RESET (active-low)** pulse (100–140 ns) initializes the system.
+- `LAB09.vhd` — VHDL implementation of the serial mirror detector  
+- `docs/EPS_LAB09_20240524.pdf` — official lab specification  
 
 ---
 
-### 2. **Mirror Detection (Condition A)**  
-If the first 16‑bit word on `DIN1` is the **mirror** of the first 16‑bit word on `DIN2`  
-(example: `0x00FF` and `0xFF00`):
+## 🎯 Functional Overview
 
-→ Emit **1‑clock‑cycle BINGO pulse**  
-→ Immediately start outputting `DOUT16` = the 16‑bit word received on `DIN2` (serial)
+The system processes two input serial streams:
 
----
+- **DIN1** — first 16-bit serial word  
+- **DIN2** — second 16-bit serial word  
 
-### 3. **Internal Byte-Mirroring (Condition B)**  
-If either input also satisfies internal mirroring:
+Once both words are received, two mirror checks are performed:
+
+### **1. External Mirror Check (Condition A)**  
+If:
 
 ```
-Byte1: 01010101
-Byte2: 10101010
+DIN1 = reverse(DIN2)
 ```
 
-→ Emit **2‑clock‑cycle BINGO pulse**  
-→ After BINGO ends, output `DOUT_BYTE` = the first byte received from `DIN1`
+Then:
+
+- Emit a **1-clock BINGO pulse**
+- Begin serial transmission of `DIN2` on `DOUT16`
 
 ---
 
-### 4. **High‑Impedance Mode**
-If neither mirror condition is valid:
+### **2. Internal Mirror Check (Condition B)**  
+If inside either word:
 
-- `DOUT16` → high‑impedance
-- `DOUT_BYTE` → high‑impedance  
-(This does **not** affect the BINGO pulses.)
+```
+Upper Byte (bits 15..8) = reverse(Lower Byte (bits 7..0))
+```
 
----
+Then:
 
-### 5. **Timing Requirement**
-The entity must maintain **output speed > 1 Mbit/s**, even in the worst case.
-
-The design therefore uses:
-
-- Synchronous logic  
-- Deterministic FSM  
-- Shift-register pipelines  
-- No combinational loops  
+- Emit a **2-clock BINGO pulse**
+- After the pulse, output the **first byte** of `DIN1` on `DOUT_BYTE`
 
 ---
 
-## 🧩 Entity Ports (Reconstructed)
+### **DISABLE Mode**
+
+If `DISABLE = '1'`:
+
+- `DOUT16` → high-impedance  
+- `DOUT_BYTE` → high-impedance  
+- `BINGO` output remains active  
+
+---
+
+### **RESET Requirement**
+
+`RESET_N` is **active LOW** and must be asserted for **100–140 ns** to properly initialize:
+
+- Shift registers  
+- Output drivers  
+- Internal FSM  
+- Counters and pipelines  
+
+---
+
+## 🔌 Entity Ports
 
 ```vhdl
 CLK        : in  std_logic;
-RESET_N    : in  std_logic; -- active low
+RESET_N    : in  std_logic;   -- Active low
 DISABLE    : in  std_logic;
 DIN1       : in  std_logic;
 DIN2       : in  std_logic;
 
 BINGO      : out std_logic;
-DOUT16     : out std_logic;               -- serial output
+DOUT16     : out std_logic;                  -- Serial output
 DOUT_BYTE  : out std_logic_vector(7 downto 0);
 ```
 
 ---
 
-## 🧠 Internal Architecture (Conceptual)
+## 🧠 Internal Architecture
 
-### ✔ 1. Shift registers  
-Two 16‑bit shift registers collect serial data:
+### ✔ 1. Shift Register Stage
 
-```text
+Two synchronous 16-bit shift registers are used:
+
+```
 SR1 ← DIN1
 SR2 ← DIN2
 ```
 
-### ✔ 2. Mirror comparators  
+---
 
-- **External Mirror Check**
-  ```
-  SR1 = reverse(SR2)
-  ```
+### ✔ 2. Mirror Detection Logic
 
-- **Internal Mirror Check**
-  ```
-  SRx[15:8] = reverse(SRx[7:0])
-  ```
-
-### ✔ 3. State Machine
-
+#### **External Mirror Condition**
 ```
-IDLE → LOAD16 → CHECK → 
-  → OUTPUT_16      (if condition A)
-  → OUTPUT_BYTE    (if condition B)
+SR1 = reverse(SR2)
 ```
 
-### ✔ 4. Tri‑state Output Drivers
-
+#### **Internal Byte-Mirror Condition**
 ```
-if DISABLE = '1' → outputs = 'Z'
+SR1[15:8] = reverse(SR1[7:0])
+SR2[15:8] = reverse(SR2[7:0])
 ```
 
 ---
 
-## ⏱ Waveform Diagram (ASCII)
+### ✔ 3. Finite State Machine (FSM)
 
-### **Case A: External Mirror Detected (1‑cycle BINGO)**
+Core FSM:
 
 ```
-CLK     : ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ...
-          │ │ │ │ │ │ │ │ │ │ │ │ │ │ │ │
-RESET_N : ────────┐___________________________
-                  │
-DIN1    : <------ 16 bits ------>
-DIN2    : <------ 16 bits ------>
-BINGO   : _____________________┌─┐____________
-                               │ │ 1 clock
-                               └─┘
-DOUT16  :  ←──── serial output of DIN2 ─────→
+IDLE
+  ↓
+LOAD16
+  ↓
+CHECK
+  ↙            ↘
+OUTPUT_16    OUTPUT_BYTE
+```
+
+- `OUTPUT_16` handles Condition A  
+- `OUTPUT_BYTE` handles Condition B  
+
+---
+
+### ✔ 4. Output Drivers
+
+- `DOUT16` serializes the full 16 bits of `DIN2`
+- `DOUT_BYTE` outputs byte 0 from `DIN1`
+- `DISABLE` forces outputs to `'Z'`
+
+---
+
+## ⏱ Waveform Diagrams
+
+### **Case A – External Mirror Detection**
+
+```
+CLK       : ┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐┌─┐...
+DIN1      : <-------- 16 bits -------->
+DIN2      : <-------- 16 bits -------->
+
+BINGO     : ____________________┌─┐__________________
+                                │ │ 1 cycle
+                                └─┘
+
+DOUT16    : ---- serial output of DIN2 (16 cycles) ----
 ```
 
 ---
 
-### **Case B: Byte Mirror Present (2‑cycle BINGO)**
+### **Case B – Internal Mirror Detection**
 
 ```
-BINGO     : ____________________┌───────┐______
-                                │       │ 2 cycles
-                                └───────┘
-DOUT_BYTE : (byte extracted from DIN1) → after BINGO
+BINGO     : ___________________┌───────┐_____________
+                              │       │ 2 cycles
+                              └───────┘
+
+DOUT_BYTE : -------- first byte of DIN1 -------->
 ```
 
 ---
 
-## ▶️ Synthesis Notes
+## ▶️ Simulation & Synthesis Notes
 
-- Written in synthesizable VHDL-93  
-- Suitable for Spartan‑3, XC3S200, VQ100, -4  
-- Meets timing > 1 MHz by construction  
-- No inferred latches  
-- Fully synchronous to `CLK`
+- Fully synchronous to `CLK`  
+- No combinational loops  
+- Output throughput exceeds **1 Mbit/s**  
+- Suitable for FPGA synthesis (Spartan-3 XC3S200)
 
 ---
 
 ## 👤 Author
 
 **Hamed Nahvi**
-
----
-
-# 💡 Suggested Repository Names
-
-### **Professional & Clean**
-- `fpga-serial-mirror-detector`  ⭐ *best*
-- `vhdl-mirror-checker`
-- `eps-lab09-serial-detector`
-
-### **More Technical**
-- `fpga-serial-analyzer-lab09`
-- `serial-mirror-engine-fpga`
-- `vhdl-bingo-detector-lab09`
-
-### **Academic Style**
-- `LAB09-EPS-VHDL`
-- `EPS_LAB09_SerialLogic`
-
-**Recommended:**  
-## ⭐ `fpga-serial-mirror-detector`
-
-Clean, descriptive, and looks excellent on a CV or portfolio.
-
