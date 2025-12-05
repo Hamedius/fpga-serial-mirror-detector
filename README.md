@@ -1,4 +1,4 @@
-# EPS LAB 09 – Serial Mirror Detector & Data Extractor (VHDL)
+# fpga Serial Mirror Detector & Data Extractor (VHDL)
 
 This project implements the **LAB09** assignment from the  
 **Electronics Programmable Systems (EPS)** course at the University of Palermo.  
@@ -8,7 +8,7 @@ The design is fully synchronous and is suitable for FPGA implementation.
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 eps-lab09-serial-detector/
@@ -24,7 +24,7 @@ eps-lab09-serial-detector/
 
 ---
 
-## 🎯 Functional Overview
+## Functional Overview
 
 The system processes two input serial streams:
 
@@ -82,7 +82,7 @@ If `DISABLE = '1'`:
 
 ---
 
-## 🔌 Entity Ports
+## Entity Ports
 
 ```vhdl
 CLK        : in  std_logic;
@@ -98,7 +98,7 @@ DOUT_BYTE  : out std_logic_vector(7 downto 0);
 
 ---
 
-## 🧠 Internal Architecture
+## Internal Architecture
 
 ### ✔ 1. Shift Register Stage
 
@@ -153,7 +153,7 @@ OUTPUT_16    OUTPUT_BYTE
 
 ---
 
-## ⏱ Waveform Diagrams
+## Waveform Diagrams
 
 ### **Case A – External Mirror Detection**
 
@@ -175,15 +175,15 @@ DOUT16    : ---- serial output of DIN2 (16 cycles) ----
 
 ```
 BINGO     : ___________________┌───────┐_____________
-                              │       │ 2 cycles
-                              └───────┘
+                               │       │ 2 cycles
+                               └───────┘
 
 DOUT_BYTE : -------- first byte of DIN1 -------->
 ```
 
 ---
 
-## ▶️ Simulation & Synthesis Notes
+## Simulation & Synthesis Notes
 
 - Fully synchronous to `CLK`  
 - No combinational loops  
@@ -192,6 +192,6 @@ DOUT_BYTE : -------- first byte of DIN1 -------->
 
 ---
 
-## 👤 Author
+##  Author
 
 **Hamed Nahvi**
